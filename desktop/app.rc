@@ -1,0 +1,24 @@
+1 ICON "app.ico"
+1 24 "app.manifest"
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "Bikini Bottom Builder - level editor for Battle for Bikini Bottom (GBA)"
+      VALUE "FileVersion", "1.0.0"
+      VALUE "ProductName", "Bikini Bottom Builder"
+      VALUE "ProductVersion", "1.0.0"
+      VALUE "OriginalFilename", "BikiniBottomBuilder.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

@@ -1,0 +1,715 @@
+<title>Bikini Bottom Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..700&family=Silkscreen&display=swap">
+<style>
+/* Layout: indigo "console shell" header band, square key-like tool rail, level stage, side panel; stacks on phones.
+   Palette taken from the GBA's indigo plastic and grey keys; one hot pink for selection. */
+:root {
+  --shell: #3d3a8f; --shell-ink: #f3f1ff;
+  --bg: #dcdae6; --panel: #f4f3f8; --ink: #1b1930; --muted: #57546f; --line: #a9a6bf;
+  --key: #cfccdd; --key-edge: #8e8aa8; --primary: #3d3a8f; --primary-ink: #ffffff; --primary-edge: #23215c;
+  --hi: #d6336c; --canvas-bg: #102a43; --danger: #b42318;
+  --ui: "Archivo", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  --pixel: "Silkscreen", "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --shell: #2a2866; --shell-ink: #ecebff;
+  --bg: #15142a; --panel: #1e1c38; --ink: #e9e7f7; --muted: #a29fc0; --line: #403d69;
+  --key: #2c2a52; --key-edge: #0e0d20; --primary: #8580f0; --primary-ink: #11102a; --primary-edge: #4a45b8;
+  --hi: #ff5c8a; --canvas-bg: #0a1b2e; --danger: #ff8a7a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --shell: #2a2866; --shell-ink: #ecebff;
+  --bg: #15142a; --panel: #1e1c38; --ink: #e9e7f7; --muted: #a29fc0; --line: #403d69;
+  --key: #2c2a52; --key-edge: #0e0d20; --primary: #8580f0; --primary-ink: #11102a; --primary-edge: #4a45b8;
+  --hi: #ff5c8a; --canvas-bg: #0a1b2e; --danger: #ff8a7a; color-scheme: dark }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--ui); font-size: 14px; font-variant-numeric: tabular-nums; }
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px; gap: 10px; box-sizing: border-box; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; background: var(--shell); color: var(--shell-ink); padding: 10px 12px; border: 2px solid var(--primary-edge); }
+h1 { font-family: var(--pixel); font-weight: 400; font-size: 1.15rem; margin: 0; letter-spacing: .02em; line-height: 1; }
+.tagline { font-size: .8rem; opacity: .8; font-stretch: 87%; }
+.spacer { flex: 1; }
+button, select, input { font: inherit; color: inherit; }
+button { background: var(--key); border: 2px solid var(--key-edge); border-radius: 0; padding: 5px 12px 7px; cursor: pointer; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); font-weight: 600; font-stretch: 92%; }
+button:hover { background: color-mix(in srgb, var(--key) 85%, var(--ink)); }
+button:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 -1px 0 rgba(0,0,0,.18); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+button.primary { background: var(--primary); color: var(--primary-ink); border-color: var(--primary-edge); }
+header button { border-color: var(--primary-edge); }
+header button:not(.primary) { color: var(--ink); }
+header button.primary { background: var(--shell-ink); color: var(--shell); }
+button:disabled { opacity: .45; cursor: default; }
+select, input[type=number] { background: var(--panel); border: 2px solid var(--line); border-radius: 0; padding: 5px 8px; }
+header select { border-color: var(--primary-edge); background: var(--panel); color: var(--ink); }
+header label { color: var(--shell-ink); }
+input[type=number] { width: 5.5em; }
+.main { --panel-w: 340px; display: grid; grid-template-columns: auto minmax(0, 1fr) 10px var(--panel-w); column-gap: 10px; min-height: 0; }
+.splitter { cursor: col-resize; margin-inline: -10px; display: grid; place-items: center; touch-action: none; }
+.splitter::before { content: ""; width: 4px; height: 44px; background: repeating-linear-gradient(var(--line) 0 2px, transparent 2px 4px); }
+.splitter:hover::before, .splitter.dragging::before { background: repeating-linear-gradient(var(--primary) 0 2px, transparent 2px 4px); }
+body.resizing { cursor: col-resize; user-select: none; }
+.rail { display: flex; flex-direction: column; gap: 6px; }
+.rail button { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 66px; padding: 6px 4px 8px; font-size: .74rem; }
+.ico { width: 32px; height: 32px; image-rendering: pixelated; }
+.ico16 { width: 16px; height: 16px; image-rendering: pixelated; vertical-align: -3px; margin-right: 6px; }
+button:disabled .ico, button:disabled .ico16 { filter: grayscale(1); opacity: .6; }
+.rail button[aria-pressed=true] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary-edge); }
+.stage-wrap { position: relative; min-width: 0; min-height: 0; display: grid; border: 2px solid var(--line); background: var(--canvas-bg); }
+#cv-sky { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.stage { position: relative; overflow: auto; min-height: 240px; }
+.layers { position: relative; transform-origin: 0 0; }
+.layers canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+#cv-top { cursor: crosshair; touch-action: none; }
+.panel { background: var(--panel); border: 2px solid var(--line); padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel section + section { border-top: 1px solid var(--line); padding-top: 14px; }
+.panel h2 { font-size: 1rem; font-weight: 700; font-stretch: 100%; margin: 0 0 8px; }
+.label { font-size: .82rem; font-weight: 600; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; }
+.kv span { color: var(--muted); font-size: .82rem; }
+.hint { color: var(--muted); font-size: .84rem; line-height: 1.5; margin: 0; }
+#palette { display: block; image-rendering: pixelated; background: var(--canvas-bg); border: 2px solid var(--line); cursor: pointer; max-width: 100%; }
+#palette-wrap { min-width: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+.swatches h3 { grid-column: 1 / -1; margin: 6px 0 0; font-size: .74rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.swatch .n { opacity: .6; font-weight: 700; min-width: 1.4em; }
+.swatch { display: flex; align-items: center; gap: 6px; padding: 4px 6px 5px; font-size: .78rem; font-weight: 500; text-align: left; line-height: 1.15; }
+.swatch i { width: 12px; height: 12px; flex: none; }
+.swatch[aria-pressed=true] { outline: 2px solid var(--hi); outline-offset: -2px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .88rem; }
+.toggles label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+input[type=checkbox] { accent-color: var(--primary); width: 15px; height: 15px; }
+.status { font-size: .8rem; color: var(--muted); }
+.typelist { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: .78rem; padding: 3px 8px 4px; display: inline-flex; align-items: center; gap: 5px; }
+.chip img { width: 16px; height: 16px; object-fit: contain; image-rendering: pixelated; }
+.objgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px; max-height: 300px; overflow: auto; padding: 2px; }
+.objgrid h3 { grid-column: 1 / -1; margin: 6px 0 0; font-size: .74rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.objbtn { position: relative; display: grid; place-items: center; height: 52px; padding: 2px; background: color-mix(in srgb, var(--canvas-bg) 22%, var(--key)); }
+.objbtn img { max-width: 44px; max-height: 40px; image-rendering: pixelated; }
+.objbtn .num { position: absolute; left: 2px; top: 1px; font-size: .62rem; font-weight: 700; opacity: .75; }
+.objbtn .txt { font-size: .6rem; font-weight: 600; line-height: 1.1; text-align: center; overflow: hidden; max-height: 2.2em; }
+.objbtn[aria-pressed=true] { outline: 3px solid var(--hi); outline-offset: -3px; }
+.objinfo { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; margin-top: 10px; }
+.objinfo .pic { width: 56px; height: 56px; display: grid; place-items: center; background: var(--canvas-bg); border: 2px solid var(--line); }
+.objinfo .pic img { max-width: 52px; max-height: 52px; image-rendering: pixelated; }
+.objinfo b { display: block; font-size: .95rem; }
+.objinfo small { display: block; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.warn { color: var(--danger); }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; color: #eef3ff; }
+.empty .card { display: flex; }
+.empty h2 { font-family: var(--pixel); font-weight: 400; font-size: 1.35rem; line-height: 1.25; margin: 0; }
+.empty p { margin: 0; line-height: 1.55; color: #b7c6dc; }
+.drop { border: 2px dashed #6f7fd6; padding: 24px 26px; background: rgba(16, 42, 67, .6); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--shell); color: var(--shell-ink); border: 2px solid var(--primary-edge); padding: 9px 14px; font-size: .88rem; max-width: calc(100% - 32px); z-index: 20; }
+.danger { color: var(--danger); }
+@media (max-width: 900px) {
+  .app { height: auto; }
+  .main { grid-template-columns: 1fr; }
+  .splitter { display: none; }
+  .rail { flex-direction: row; flex-wrap: wrap; }
+  .stage-wrap { height: 60vh; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } button:active { transform: none !important; } }
+</style>
+
+<div class="app">
+  <header>
+    <div><h1>Bikini Bottom Builder</h1><div class="tagline">Level editor for Battle for Bikini Bottom on GBA</div></div>
+    <div class="row">
+      <button id="btn-open" class="primary"><img class="ico16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbklEQVR4nM2S4Q6AIAiEOeaD45NfP8zQcob1o76NTdHjmCjyNWjWnJzdFiBPciBWBL2YTfooMjVX33PPuYoch5m7aS9eJy20PIKproDS3gpA9wZxcvYp6VP3FkoZZSjMyv0qVpF37pDrF47qfsIGKilD8BZLqEkAAAAASUVORK5CYII=" alt="" width="16" height="16">Open ROM</button>
+      <input id="file" type="file" accept=".gba,.bin" hidden>
+      <select id="room" aria-label="Room" disabled></select>
+      <label class="row">Zoom <select id="zoom" aria-label="Zoom"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+    </div>
+    <div class="spacer"></div>
+    <div class="row">
+      <button id="btn-undo" disabled title="Undo (Ctrl+Z)"><img class="ico16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZElEQVR4nM2S2w7AIAhDy/7/n7eXzVXSYdmTTYwSOchFYFed91rq0LDFAgDiG85XmmHDfDmmw2O10mbeyEBUSXdOD0qfPIUoeiR91BhzkFK+56uyhBaMNIUFSBt9gWaAoT+la11QjBgR57mLSwAAAABJRU5ErkJggg==" alt="" width="16" height="16">Undo</button>
+      <button id="btn-redo" disabled title="Redo (Ctrl+Shift+Z)"><img class="ico16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbUlEQVR4nNVSyw6AMAiDxf//ZTxoItA2k3iSZBfoA9KZ/aXiflBrpoEirpC67YXniBB89C1K8Y6IIo7kfhUTfswPNUi9dlrFpBQYua+EmEGM3CAJ8JwTm21n6xqkMIZxtH8QvU1dlQBz3wp8rhMlqxYb812aEgAAAABJRU5ErkJggg==" alt="" width="16" height="16">Redo</button>
+      <button id="btn-export" class="primary" disabled><img class="ico16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAd0lEQVR4nKWTyxHAIAhE2YyFURql0ZkeJImjg/jZkyI8VkZBRJnOBVSA2F5IVacVzExt/hO1YOYpNAREugakKCGaSQcQG9JMEjmQMbTjYE1/XmqDOa+9KQAfZLhCPfTVNxkAqy5cgOfAA187sM+0V9y6fFenXxoFOjQkp6eGfUgAAAAASUVORK5CYII=" alt="" width="16" height="16"><span id="export-label">Export ROM</span></button>
+    </div>
+  </header>
+
+  <div class="main">
+    <nav class="rail" aria-label="Tools">
+      <button data-tool="select" aria-pressed="true" title="Select and move objects (V)"><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAaklEQVR4nKXQWQ7AIAhF0Qvp/rdMf6RRi1UoiTEO70gEMH6UtrmMKICZlRHvoIxov6ggOm9kkReQRUIggyyBU+RaHYjIYAES3Rs6mEK0kI+wHqCFxZHUH3h4d/mrgz6c6kKrL5+U7V4HuAEKESkRAgcB+QAAAABJRU5ErkJggg==" alt="" width="32" height="32">Objects</button>
+      <button data-tool="add" aria-pressed="false" title="Place a new object (A)"><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAfklEQVR4nJWSSw7AIAhEwfTgeHK6KbEjH3E2TWHmQYhMXhrUOKi5hhIRaRDn5XIgK+gKauY1EDQGWvJwpoHT67AITIk26E9OAPdqA+bMAcyHzS383QDcz0XQpH+Ie0ibef3jNwQAyGkHFQCESdGVDuCwRXlECm60926eXgh4AZzvICOUiS37AAAAAElFTkSuQmCC" alt="" width="32" height="32">Add</button>
+      <button data-tool="tile" aria-pressed="false" title="Paint tiles, right-click picks (T)"><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAoElEQVR4nKWSUQrEMAhEJ2UP5s06vZk3cz+SrdbGbqCCKCEzeUoaAMOL+PRSeTSQhIhAVW+VJLbzbvQIfSUWEQAIBu3y8BmVWFWTQUGxTlBQrBMUe/xH0GrpWnQCjrTQc4BZT9L7Xzo8YbBRYw+Y2TVJ7wGY7+AIXKE/4jmAfZ+NEA/ThSzIptv09SR6ovARouhBkM3uO5ggR2Ee6fU/+AI/0Imw84iHdwAAAABJRU5ErkJggg==" alt="" width="32" height="32">Tiles</button>
+      <button data-tool="col" aria-pressed="false" title="Paint collision (C)"><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAOklEQVR4nGNgoBAwMjAw/KfEABYGPCYQMp0RZkAjHkX45IixhCDA8AI+E9HlcHqBFC+NxsKwiIWBBwAuABQr3ICF8gAAAABJRU5ErkJggg==" alt="" width="32" height="32">Collision</button>
+      <button data-tool="copy" aria-pressed="false" title="Copy a region with its collision (R)"><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAeUlEQVR4nMWSwQ3AIAwDz1UHY/Rs5n4A0RY+oVLzgSAdtiHwQdm2M2uns6p9n3UOcNpGEgAR8bqslKKFAyRxNrhVRIzwUr5xsm3VbuZg5ahxqlmmNiPCT0dDJAO6vcFCcXo+clu/cCTHgJHbm8S/qqsfGbjm34rQ4QtCVYl4uBxInAAAAABJRU5ErkJggg==" alt="" width="32" height="32">Copy</button>
+      <button data-tool="paste" aria-pressed="false" title="Stamp the copied region (P)" disabled><img class="ico" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAfElEQVR4nLVSQQ7AIAiDZf/Sp+nP+Bm7OAMoypLZkyAttRHBB5saZ0PTJgBwMY3izF8LByF4AigdeNuPOgjD2rLJb3lSgIkoxM45d+5tL1NKS3KtVdVKgIgg6uKFesInZuMOIe5U0CweMvD+9jH0hdwyQABkkYes7fkXBw8KCxrf5x12vQAAAABJRU5ErkJggg==" alt="" width="32" height="32">Stamp</button>
+    </nav>
+
+    <div class="stage-wrap" id="stage-wrap">
+    <canvas id="cv-sky" aria-hidden="true"></canvas>
+    <div class="stage" id="stage">
+      <div class="layers" id="layers">
+        <canvas id="cv-map"></canvas><canvas id="cv-over"></canvas><canvas id="cv-col"></canvas><canvas id="cv-top"></canvas>
+      </div>
+      <div class="empty" id="empty">
+        <div class="card" id="drop">
+          <button class="primary" id="btn-open2"><img class="ico16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbklEQVR4nM2S4Q6AIAiEOeaD45NfP8zQcob1o76NTdHjmCjyNWjWnJzdFiBPciBWBL2YTfooMjVX33PPuYoch5m7aS9eJy20PIKproDS3gpA9wZxcvYp6VP3FkoZZSjMyv0qVpF37pDrF47qfsIGKilD8BZLqEkAAAAASUVORK5CYII=" alt="" width="16" height="16">Choose .gba file</button>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize side panel" tabindex="0" title="Drag to resize"></div>
+    <aside class="panel" id="panel">
+      <section>
+        <h2>View</h2>
+        <div class="toggles">
+          <label><input type="checkbox" id="show-over" checked> Front layer</label>
+          <label><input type="checkbox" id="show-col" checked> Collision</label>
+          <label><input type="checkbox" id="show-obj" checked> Objects</label>
+          <label><input type="checkbox" id="show-spr" checked> Object sprites</label>
+          <label><input type="checkbox" id="show-lbl" checked> Object names</label>
+          <label><input type="checkbox" id="show-sky" checked> Background</label>
+          <label><input type="checkbox" id="show-grid"> Grid</label>
+        </div>
+      </section>
+
+      <section id="sec-select">
+        <h2>Object</h2>
+        <div id="obj-none" class="hint">Click an object to select it, then drag to move. Delete key removes it.</div>
+        <div id="obj-edit" hidden>
+          <div class="kv">
+            <span>Type</span><div class="row"><input type="number" id="o-type" min="0" max="255"><b id="o-name"></b></div>
+            <span>X</span><input type="number" id="o-x" min="0">
+            <span>Y</span><input type="number" id="o-y" min="0">
+            <span>Props</span><input type="number" id="o-prop" min="0">
+          </div>
+          <div class="objinfo" id="o-info"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="o-dup">Duplicate</button><button id="o-del" class="danger">Delete</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-add" hidden>
+        <h2>New object</h2>
+        <div class="row">
+          <select id="a-cat" aria-label="Category"></select>
+          <label class="label">Type <input type="number" id="a-type" value="33" min="0" max="255"></label>
+        </div>
+        <div class="objgrid" id="objgrid" style="margin-top:8px"></div>
+        <div class="objinfo" id="a-info"></div>
+        <p class="label" style="margin-top:12px">Types in this room</p>
+        <div class="typelist" id="typelist"></div>
+        <p class="hint" style="margin-top:8px">Every type was tested in-game. Names with ? are best guesses at what the object does. Objects marked "home levels" didn't appear when placed in 1-1, so use them in the levels listed. Props picks the object's settings for this room; copy it from an existing object of the same type.</p>
+      </section>
+
+      <section id="sec-tile" hidden>
+        <h2>Tile palette</h2>
+        <p class="hint" style="margin-bottom:6px">Pick a 16×16 tile. Right-click the level to pick one up. Tiles don't change collision; use Collision or Copy/Stamp for that.</p>
+        <div class="row" style="margin-bottom:8px"><label class="row" for="pal-size">Tile size <select id="pal-size"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></label></div>
+        <div id="palette-wrap"><canvas id="palette"></canvas></div>
+        <p class="status" id="tile-info"></p>
+      </section>
+
+      <section id="sec-col" hidden>
+        <h2>Collision brush</h2>
+        <div class="swatches" id="swatches"></div>
+        <p class="hint" id="col-desc" style="margin-top:8px"></p>
+        <p class="hint" style="margin-top:6px">Collision is an 8×8 grid of thin lines, not filled blocks: a floor is one row of Solid, a wall one column. Right-click erases. The yellow line usually sits a few pixels below the top of the ground art; SpongeBob's feet land on it. Every value was tested in-game; hover a brush for details.</p>
+      </section>
+
+      <section id="sec-copy" hidden>
+        <h2>Copy &amp; stamp</h2>
+        <p class="hint">Drag a box over a platform. Its tiles and collision are copied together, then switch to Stamp and click to place copies. This is the easiest way to build new platforms that you can stand on.</p>
+        <p class="status" id="clip-info">Nothing copied yet.</p>
+      </section>
+
+      <section>
+        <h2>Room</h2>
+        <div class="kv status" id="room-info"><span>—</span><span></span></div>
+      </section>
+      <p class="status" id="status"></p>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/*__CORE__*/
+</script>
+<script>
+(() => {
+const $ = (id) => document.getElementById(id);
+const COL_COLORS = BB.COL_COLORS, COL_INFO = BB.COL_INFO;
+const INFO = BB.OBJ_INFO || {}, ICONS = BB.OBJ_ICONS || {};
+const ICON_IMG = {}, ICON_URL = {};
+for (const t in ICONS) { ICON_URL[t] = "data:image/png;base64," + ICONS[t][4]; const im = new Image(); im.src = ICON_URL[t]; ICON_IMG[t] = im; }
+function roomLabel(i) { const l = BB.LEVELS.find(x => x[0] === i); return l ? (l[4] > 1 ? `${l[2]} (${l[3]}/${l[4]})` : l[2]) : "Room " + i; }
+const S = { srcBytes: null, rom: null, rooms: [], room: null, tool: "select", zoom: 2, sel: -1, tile: 1, colVal: 8,
+            clip: null, undo: [], atlas: null, overAtlas: null, drag: null, hover: null };
+
+function toast(msg, ms = 3200) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, ms); }
+function objName(t) { const i = INFO[t]; return i ? (i.g ? i.n + "?" : i.n) : "Type " + t + " (invalid)"; }
+function objInfoHTML(t) {
+  const i = INFO[t], pic = ICON_URL[t] ? `<img alt="" src="${ICON_URL[t]}">` : `<span class="label">${i && i.test === "invisible" ? "invisible" : "?"}</span>`;
+  if (!i) return `<div class="pic">${pic}</div><div><b>Type ${t}</b><small class="warn">Not a valid object type. The game ignores types 1–8 and anything above 115.</small></div>`;
+  const home = i.home.length ? i.home.slice(0, 3).map(roomLabel).join(", ") + (i.home.length > 3 ? "…" : "") : "not used in any level";
+  const test = i.test === "home" ? `<small class="warn">Didn't appear when placed in 1-1; works in its home levels.</small>` : i.test === "invisible" ? `<small>Invisible in-game.</small>` : "";
+  return `<div class="pic">${pic}</div><div><b>${objName(t)}</b><small>${i.c} · type ${t} · ${i.cnt} in the game</small><small>Home: ${home}</small>${test}</div>`;
+}
+function buildObjGrid() {
+  const cat = $("a-cat").value, g = $("objgrid"), cur = +$("a-type").value; g.innerHTML = "";
+  for (const c of BB.OBJ_CATS || []) {
+    if (cat !== "all" && cat !== c) continue;
+    const ts = Object.keys(INFO).map(Number).filter(t => INFO[t].c === c).sort((a, b) => a - b);
+    const h = document.createElement("h3"); h.textContent = c; g.append(h);
+    for (const t of ts) {
+      const b = document.createElement("button"); b.className = "objbtn"; b.title = `${t} · ${objName(t)}`; b.dataset.t = t; b.setAttribute("aria-pressed", t === cur);
+      b.innerHTML = (ICON_URL[t] ? `<img alt="" src="${ICON_URL[t]}">` : `<span class="txt">${objName(t)}</span>`) + `<span class="num">${t}</span>`;
+      b.onclick = () => { $("a-type").value = t; updatePanels(); };
+      g.append(b);
+    }
+  }
+}
+
+// ---------- loading ----------
+async function openFile(f) {
+  const buf = new Uint8Array(await f.arrayBuffer());
+  const rom = new BB.Rom(buf);
+  if (buf.length < 0x800000 || rom.gameCode() !== "BSQE") { toast("That file isn't the US Battle for Bikini Bottom ROM (game code BSQE)."); return; }
+  S.srcBytes = buf; S.rom = rom; S.rooms = new Array(BB.ROOM_COUNT).fill(null); S.undo = []; S.redo = [];
+  S.fileName = f.name.replace(/\.[^.]+$/, "");
+  const sel = $("room"); sel.innerHTML = "";
+  const groups = {};
+  for (const [i, ch, level, part, parts] of BB.LEVELS) {
+    if (!groups[ch]) { groups[ch] = document.createElement("optgroup"); groups[ch].label = "Chapter " + ch; sel.append(groups[ch]); }
+    let label = level + (parts > 1 ? ` (part ${part} of ${parts})` : "");
+    try { BB.loadRoom(rom, i); } catch (e) { label += " (unreadable)"; }
+    groups[ch].append(new Option(label, i));
+  }
+  sel.disabled = false; $("btn-export").disabled = false; $("empty").hidden = true;
+  selectRoom(0);
+  toast("Loaded " + f.name);
+}
+
+function getRoom(i) { if (!S.rooms[i]) { S.rooms[i] = BB.loadRoom(S.rom, i); S.rooms[i].dirty = {}; } return S.rooms[i]; }
+
+function buildAtlas(room, metas, fourbpp) {
+  const n = metas.length / 4, cols = 32, rows = Math.ceil(n / cols);
+  const w = cols * 16, h = rows * 16, rgba = new Uint8ClampedArray(w * h * 4);
+  for (let m = 0; m < n; m++) BB.drawMetatile(S.rom, room, m, rgba, w, (m % cols) * 16, Math.floor(m / cols) * 16, fourbpp, metas);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").putImageData(new ImageData(rgba, w, h), 0, 0);
+  return { canvas: c, n, cols };
+}
+
+function selectRoom(i) {
+  const room = getRoom(i); S.room = room; S.sel = -1;
+  S.atlas = buildAtlas(room, room.metatiles, false);
+  S.overAtlas = room.overlay ? buildAtlas(room, room.overlay.metatiles, true) : null;
+  const W = room.map.w * 16, H = room.map.h * 16;
+  for (const id of ["cv-map", "cv-over", "cv-col", "cv-top"]) { const c = $(id); c.width = W; c.height = H; }
+  S.bgs = room.bgs.map(b => {
+    const at = buildAtlas(room, b.metas, true), c = document.createElement("canvas");
+    c.width = b.map.w * 16; c.height = b.map.h * 16; const g = c.getContext("2d");
+    for (let y = 0; y < b.map.h; y++) for (let x = 0; x < b.map.w; x++) { const m = b.map.grid[y * b.map.w + x]; if (m) g.drawImage(at.canvas, (m % 32) * 16, Math.floor(m / 32) * 16, 16, 16, x * 16, y * 16, 16, 16); }
+    const px = (yy) => { const d = g.getImageData(0, yy, 1, 1).data; return d[3] ? `rgb(${d[0]},${d[1]},${d[2]})` : null; };
+    return { canvas: c, fx: b.fx, fy: b.fy, top: px(0), bottom: px(c.height - 1) };
+  });
+  drawAllMap(); drawOverlay(); drawCol(); drawTop(); drawPalette(); applyZoom(); updatePanels(); roomInfo(); drawSky();
+}
+
+// Parallax backdrop: the game centres a layer at 120 + (camX - 120) * fx, 80 + (camY - 80) * fy.
+function drawSky() {
+  const sky = $("cv-sky"), st = $("stage"), on = $("show-sky").checked && S.room;
+  const W = st.clientWidth, H = st.clientHeight;
+  if (sky.width !== W || sky.height !== H) { sky.width = W; sky.height = H; }
+  const g = sky.getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, W, H);
+  sky.hidden = !on; if (!on) return;
+  const z = S.zoom, vw = W / z, vh = H / z, cx = st.scrollLeft / z + vw / 2, cy = st.scrollTop / z + vh / 2;
+  S.bgs.forEach((b, n) => {
+    const bw = b.canvas.width, bh = b.canvas.height;
+    const left = 120 + (cx - 120) * b.fx - vw / 2, top = 80 + (cy - 80) * b.fy - vh / 2;
+    const y0 = Math.round(-top * z);
+    if (n === 0) {
+      if (b.top) { g.fillStyle = b.top; g.fillRect(0, 0, W, Math.max(0, y0)); }
+      if (b.bottom) { g.fillStyle = b.bottom; g.fillRect(0, y0 + bh * z, W, H); }
+    }
+    for (let tx = Math.floor(left / bw) * bw; tx < left + vw; tx += bw) g.drawImage(b.canvas, Math.round((tx - left) * z), y0, bw * z, bh * z);
+  });
+}
+
+// ---------- drawing ----------
+function drawCell(x, y) {
+  const r = S.room, g = $("cv-map").getContext("2d"), m = r.map.grid[y * r.map.w + x];
+  g.clearRect(x * 16, y * 16, 16, 16);
+  if (m) g.drawImage(S.atlas.canvas, (m % 32) * 16, Math.floor(m / 32) * 16, 16, 16, x * 16, y * 16, 16, 16);
+}
+function drawAllMap() { const r = S.room; for (let y = 0; y < r.map.h; y++) for (let x = 0; x < r.map.w; x++) drawCell(x, y); }
+function drawOverlay() {
+  const r = S.room, c = $("cv-over"), g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+  c.hidden = !$("show-over").checked || !r.overlay; if (!r.overlay) return;
+  const o = r.overlay;
+  for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) { const m = o.grid[y * o.w + x]; if (m) g.drawImage(S.overAtlas.canvas, (m % 32) * 16, Math.floor(m / 32) * 16, 16, 16, x * 16, y * 16, 16, 16); }
+}
+function drawColCell(g, x, y) {
+  const c = S.room.col, v = c.cells[y * c.w + x];
+  g.clearRect(x * 8, y * 8, 8, 8);
+  if (v) { g.fillStyle = COL_COLORS[v]; g.globalAlpha = .55; g.fillRect(x * 8, y * 8, 8, 8); g.globalAlpha = 1; }
+}
+function drawCol() {
+  const cv = $("cv-col"), g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
+  cv.hidden = !$("show-col").checked;
+  const c = S.room.col; for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (c.cells[y * c.w + x]) drawColCell(g, x, y);
+}
+function drawTop() {
+  const cv = $("cv-top"), g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
+  const r = S.room;
+  if ($("show-grid").checked) {
+    g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = 1; g.beginPath();
+    for (let x = 0; x <= r.map.w; x++) { g.moveTo(x * 16 + .5, 0); g.lineTo(x * 16 + .5, cv.height); }
+    for (let y = 0; y <= r.map.h; y++) { g.moveTo(0, y * 16 + .5); g.lineTo(cv.width, y * 16 + .5); }
+    g.stroke();
+  }
+  if ($("show-obj").checked) {
+    g.font = "600 10px Archivo, Arial Narrow, sans-serif";
+    const spr = $("show-spr").checked, lbl = $("show-lbl").checked;
+    if (spr) { g.globalAlpha = .92; r.objects.forEach(o => { const ic = ICONS[o.type], im = ICON_IMG[o.type]; if (ic && im.complete) g.drawImage(im, o.x + ic[0], o.y + ic[1]); }); g.globalAlpha = 1; }
+    r.objects.forEach((o, i) => {
+      const s = i === S.sel;
+      g.fillStyle = s ? "#ff5c8a" : (o.type === 0 ? "#b9b5ff" : "rgba(255,255,255,.9)");
+      g.strokeStyle = "#0b1c2e"; g.lineWidth = 2;
+      g.beginPath(); g.arc(o.x, o.y, s ? 6 : 5, 0, 7); g.fill(); g.stroke();
+      if (!lbl && !s) return;
+      const label = objName(o.type);
+      g.lineWidth = 3; g.strokeText(label, o.x + 8, o.y - 6); g.fillText(label, o.x + 8, o.y - 6);
+    });
+  }
+  const h = S.hover;
+  if (h && S.tool === "tile") { g.strokeStyle = "#ffffff"; g.lineWidth = 1; g.strokeRect(h.cx * 16 + .5, h.cy * 16 + .5, 15, 15); }
+  if (h && S.tool === "col") { g.strokeStyle = "#ffffff"; g.strokeRect(h.kx * 8 + .5, h.ky * 8 + .5, 7, 7); }
+  if (S.drag && S.drag.kind === "rect") { const q = rectOf(S.drag); g.strokeStyle = "#ffffff"; g.setLineDash([4, 3]); g.strokeRect(q.x * 16 + .5, q.y * 16 + .5, q.w * 16 - 1, q.h * 16 - 1); g.setLineDash([]); }
+  if (h && S.tool === "paste" && S.clip) { g.strokeStyle = "#ff5c8a"; g.strokeRect(h.cx * 16 + .5, h.cy * 16 + .5, S.clip.w * 16 - 1, S.clip.h * 16 - 1);
+    g.globalAlpha = .6; for (let y = 0; y < S.clip.h; y++) for (let x = 0; x < S.clip.w; x++) { const m = S.clip.tiles[y * S.clip.w + x]; if (m) g.drawImage(S.atlas.canvas, (m % 32) * 16, Math.floor(m / 32) * 16, 16, 16, (h.cx + x) * 16, (h.cy + y) * 16, 16, 16); } g.globalAlpha = 1; }
+}
+// Palette reflows to the panel width at a whole-number zoom, so tiles stay crisp at any panel size.
+function drawPalette() {
+  if (!S.atlas) return;
+  const p = $("palette"), a = S.atlas, z = +$("pal-size").value, cell = 16 * z;
+  const avail = Math.max(cell, $("palette-wrap").clientWidth - 4);
+  const cols = Math.max(1, Math.floor(avail / cell)), rows = Math.ceil(a.n / cols);
+  S.palCols = cols;
+  p.width = cols * cell; p.height = rows * cell; p.style.width = p.width + "px"; p.style.height = p.height + "px";
+  const g = p.getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, p.width, p.height);
+  for (let m = 0; m < a.n; m++) g.drawImage(a.canvas, (m % 32) * 16, Math.floor(m / 32) * 16, 16, 16, (m % cols) * cell, Math.floor(m / cols) * cell, cell, cell);
+  g.strokeStyle = "#ff5c8a"; g.lineWidth = 2; g.strokeRect((S.tile % cols) * cell + 1, Math.floor(S.tile / cols) * cell + 1, cell - 2, cell - 2);
+  $("tile-info").textContent = `Tile ${S.tile} of ${a.n - 1}`;
+}
+function applyZoom() {
+  const r = S.room, z = S.zoom, W = r.map.w * 16, H = r.map.h * 16;
+  for (const id of ["cv-map", "cv-over", "cv-col", "cv-top"]) { const c = $(id); c.style.width = W * z + "px"; c.style.height = H * z + "px"; }
+  $("layers").style.width = W * z + "px"; $("layers").style.height = H * z + "px";
+  drawSky();
+}
+function roomInfo() {
+  const r = S.room, d = r.dirty, edited = [d.map && "tiles", d.col && "collision", d.objects && "objects"].filter(Boolean).join(", ");
+  $("room-info").innerHTML = "";
+  const add = (k, v) => { const a = document.createElement("span"); a.textContent = k; const b = document.createElement("div"); b.textContent = v; $("room-info").append(a, b); };
+  const lv = BB.LEVELS.find(l => l[0] === r.index);
+  if (lv) add("Level", `${lv[2]}, part ${lv[3]} of ${lv[4]}`);
+  add("Size", `${r.map.w}×${r.map.h} tiles (${r.map.w * 16}×${r.map.h * 16} px)`);
+  add("Objects", r.objects.length); add("Tile set", `${r.metatiles.length / 4} tiles`); add("Edited", edited || "nothing yet");
+}
+
+// ---------- panels ----------
+function setTool(t) {
+  S.tool = t; S.drag = null;
+  document.querySelectorAll(".rail button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t));
+  $("sec-select").hidden = t !== "select"; $("sec-add").hidden = t !== "add"; $("sec-tile").hidden = t !== "tile";
+  $("sec-col").hidden = t !== "col"; $("sec-copy").hidden = !(t === "copy" || t === "paste");
+  if (t === "tile") drawPalette();
+  if (S.room) { drawTop(); updatePanels(); }
+}
+function updatePanels() {
+  const r = S.room; if (!r) return;
+  const o = r.objects[S.sel];
+  $("obj-none").hidden = !!o; $("obj-edit").hidden = !o;
+  if (o) { $("o-type").value = o.type; $("o-x").value = o.x; $("o-y").value = o.y; $("o-prop").value = o.prop; $("o-prop").max = r.maxProp; $("o-name").textContent = ""; $("o-info").innerHTML = objInfoHTML(o.type); }
+  const at = +$("a-type").value; $("a-info").innerHTML = objInfoHTML(at);
+  for (const b of $("objgrid").querySelectorAll(".objbtn")) b.setAttribute("aria-pressed", +b.dataset.t === at);
+  const counts = {}; r.objects.forEach(x => counts[x.type] = (counts[x.type] || 0) + 1);
+  const tl = $("typelist"); tl.innerHTML = "";
+  Object.keys(counts).map(Number).sort((a, b) => a - b).forEach(t => {
+    const b = document.createElement("button"); b.className = "chip"; b.innerHTML = (ICON_URL[t] ? `<img alt="" src="${ICON_URL[t]}">` : "") + `<span></span>`; b.lastChild.textContent = `${objName(t)} ×${counts[t]}`;
+    b.onclick = () => { $("a-type").value = t; updatePanels(); }; tl.append(b);
+  });
+  $("btn-undo").disabled = !S.undo.length; $("btn-redo").disabled = !(S.redo && S.redo.length);
+}
+function buildSwatches() {
+  const s = $("swatches"); s.innerHTML = "";
+  const groups = [["Used by the game", [0, 8, 5, 4, 1, 11, 13, 10, 14]], ["Unused", [2, 3, 6, 7, 9, 12, 15]]];
+  for (const [title, vals] of groups) {
+    const h = document.createElement("h3"); h.textContent = title; s.append(h);
+    for (const v of vals) {
+      const b = document.createElement("button"); b.className = "swatch"; b.setAttribute("aria-pressed", v === S.colVal); b.title = COL_INFO[v][1];
+      const i = document.createElement("i"); i.style.background = v ? COL_COLORS[v] : "transparent"; i.style.border = "1px solid var(--line)";
+      const n = document.createElement("span"); n.className = "n"; n.textContent = v;
+      b.append(i, n, document.createTextNode(v === 0 ? "Erase" : COL_INFO[v][0]));
+      b.onclick = () => { S.colVal = v; buildSwatches(); }; s.append(b);
+    }
+  }
+  $("col-desc").textContent = (S.colVal === 0 ? "Erase: " : COL_INFO[S.colVal][0] + ": ") + COL_INFO[S.colVal][1];
+}
+
+// ---------- editing ----------
+let stroke = null;
+function beginStroke() { stroke = { map: new Map(), col: new Map() }; }
+function endStroke() { if (stroke && (stroke.map.size || stroke.col.size)) pushHistory({ room: S.room.index, kind: "cells", ...stroke }); stroke = null; }
+function setMap(x, y, v) {
+  const r = S.room; if (x < 0 || y < 0 || x >= r.map.w || y >= r.map.h) return;
+  const k = y * r.map.w + x, old = r.map.grid[k]; if (old === v) return;
+  if (stroke && !stroke.map.has(k)) stroke.map.set(k, old);
+  r.map.grid[k] = v; r.dirty.map = true; drawCell(x, y);
+}
+function setCol(x, y, v) {
+  const c = S.room.col; if (x < 0 || y < 0 || x >= c.w || y >= c.h) return;
+  const k = y * c.w + x, old = c.cells[k]; if (old === v) return;
+  if (stroke && !stroke.col.has(k)) stroke.col.set(k, old);
+  c.cells[k] = v; S.room.dirty.col = true; drawColCell($("cv-col").getContext("2d"), x, y);
+}
+// History: each entry holds the state to restore; applying one returns its inverse for the other stack.
+const cloneObjs = (list) => list.map(o => ({ ...o }));
+function pushHistory(entry) { S.undo.push(entry); S.redo = []; updatePanels(); }
+function pushObjUndo() { pushHistory({ room: S.room.index, kind: "objects", objects: cloneObjs(S.room.objects) }); }
+function applyEntry(u) {
+  if (S.room.index !== u.room) { $("room").value = u.room; selectRoom(u.room); }
+  const r = S.room;
+  if (u.kind === "objects") {
+    const inv = { room: u.room, kind: "objects", objects: cloneObjs(r.objects) };
+    r.objects = cloneObjs(u.objects); r.dirty.objects = true; S.sel = -1; drawTop();
+    return inv;
+  }
+  const inv = { room: u.room, kind: "cells", map: new Map(), col: new Map() };
+  u.map.forEach((v, k) => { inv.map.set(k, r.map.grid[k]); r.map.grid[k] = v; drawCell(k % r.map.w, Math.floor(k / r.map.w)); });
+  u.col.forEach((v, k) => { inv.col.set(k, r.col.cells[k]); r.col.cells[k] = v; });
+  if (u.map.size) r.dirty.map = true; if (u.col.size) { r.dirty.col = true; drawCol(); }
+  return inv;
+}
+function undo() { const u = S.undo.pop(); if (!u) return; S.redo.push(applyEntry(u)); updatePanels(); roomInfo(); toast("Undone"); }
+function redo() { const u = S.redo.pop(); if (!u) return; S.undo.push(applyEntry(u)); updatePanels(); roomInfo(); toast("Redone"); }
+function hitObject(px, py) {
+  const r = S.room; let best = -1, bd = 12 / Math.max(1, S.zoom / 2);
+  r.objects.forEach((o, i) => { const d = Math.hypot(o.x - px, o.y - py); if (d < bd) { bd = d; best = i; } });
+  if (best < 0 && $("show-spr").checked) // otherwise: the smallest sprite under the cursor
+    r.objects.forEach((o, i) => { const c = ICONS[o.type]; if (!c) return; const x = o.x + c[0], y = o.y + c[1];
+      if (px >= x && px < x + c[2] && py >= y && py < y + c[3] && (best < 0 || c[2] * c[3] < bd)) { bd = c[2] * c[3]; best = i; } });
+  return best;
+}
+function rectOf(d) { const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1); return { x, y, w: Math.abs(d.x1 - d.x0) + 1, h: Math.abs(d.y1 - d.y0) + 1 }; }
+function defaultProp(t) {
+  const c = {}; S.room.objects.filter(o => o.type === t).forEach(o => c[o.prop] = (c[o.prop] || 0) + 1);
+  const best = Object.keys(c).sort((a, b) => c[b] - c[a])[0];
+  return best !== undefined ? +best : Math.min(2, S.room.maxProp);
+}
+function pos(e) {
+  const rect = $("cv-top").getBoundingClientRect();
+  const px = Math.floor((e.clientX - rect.left) / S.zoom), py = Math.floor((e.clientY - rect.top) / S.zoom);
+  return { px, py, cx: Math.floor(px / 16), cy: Math.floor(py / 16), kx: Math.floor(px / 8), ky: Math.floor(py / 8) };
+}
+
+const top = $("cv-top");
+top.addEventListener("contextmenu", e => e.preventDefault());
+top.addEventListener("pointerdown", e => {
+  if (!S.room) return; const p = pos(e); top.setPointerCapture(e.pointerId);
+  const r = S.room;
+  if (S.tool === "select") {
+    S.sel = hitObject(p.px, p.py);
+    if (S.sel >= 0) S.drag = { kind: "obj", moved: false, before: cloneObjs(r.objects) };
+    updatePanels(); drawTop();
+  } else if (S.tool === "add") {
+    pushObjUndo();
+    const t = Math.max(0, Math.min(255, +$("a-type").value || 0));
+    r.objects.push({ type: t, x: p.px, y: p.py, prop: defaultProp(t) }); r.dirty.objects = true;
+    drawTop(); updatePanels(); roomInfo(); toast(`Placed ${objName(t)} at ${p.px}, ${p.py}`);
+  } else if (S.tool === "tile") {
+    if (e.button === 2) { S.tile = r.map.grid[p.cy * r.map.w + p.cx] || 0; drawPalette(); return; }
+    beginStroke(); setMap(p.cx, p.cy, S.tile); S.drag = { kind: "paint" };
+  } else if (S.tool === "col") {
+    beginStroke(); setCol(p.kx, p.ky, e.button === 2 ? 0 : S.colVal); S.drag = { kind: "paintcol", erase: e.button === 2 };
+  } else if (S.tool === "copy") {
+    S.drag = { kind: "rect", x0: p.cx, y0: p.cy, x1: p.cx, y1: p.cy }; drawTop();
+  } else if (S.tool === "paste" && S.clip) {
+    beginStroke(); const c = S.clip;
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) setMap(p.cx + x, p.cy + y, c.tiles[y * c.w + x]);
+    for (let y = 0; y < c.h * 2; y++) for (let x = 0; x < c.w * 2; x++) setCol(p.cx * 2 + x, p.cy * 2 + y, c.col[y * c.w * 2 + x]);
+    endStroke(); roomInfo();
+  }
+});
+top.addEventListener("pointermove", e => {
+  if (!S.room) return; const p = pos(e); S.hover = p;
+  $("status").textContent = `Pixel ${p.px}, ${p.py}   Tile ${p.cx}, ${p.cy}   Collision ${p.kx}, ${p.ky}`;
+  const d = S.drag;
+  if (d && d.kind === "obj" && S.sel >= 0) { const o = S.room.objects[S.sel]; o.x = Math.max(0, p.px); o.y = Math.max(0, p.py); d.moved = true; S.room.dirty.objects = true; updatePanels(); }
+  else if (d && d.kind === "paint") setMap(p.cx, p.cy, S.tile);
+  else if (d && d.kind === "paintcol") setCol(p.kx, p.ky, d.erase ? 0 : S.colVal);
+  else if (d && d.kind === "rect") { d.x1 = p.cx; d.y1 = p.cy; }
+  drawTop();
+});
+top.addEventListener("pointerup", () => {
+  const d = S.drag; S.drag = null;
+  if (!d) return;
+  if (d.kind === "obj") { if (d.moved) pushHistory({ room: S.room.index, kind: "objects", objects: d.before }); roomInfo(); }
+  if (d.kind === "paint" || d.kind === "paintcol") { endStroke(); roomInfo(); }
+  if (d.kind === "rect") {
+    const q = rectOf(d), r = S.room, tiles = [], col = [];
+    for (let y = 0; y < q.h; y++) for (let x = 0; x < q.w; x++) tiles.push(r.map.grid[(q.y + y) * r.map.w + q.x + x] || 0);
+    for (let y = 0; y < q.h * 2; y++) for (let x = 0; x < q.w * 2; x++) col.push(r.col.cells[(q.y * 2 + y) * r.col.w + q.x * 2 + x] || 0);
+    S.clip = { w: q.w, h: q.h, tiles, col };
+    document.querySelector('[data-tool="paste"]').disabled = false;
+    $("clip-info").textContent = `Copied ${q.w}×${q.h} tiles with collision.`;
+    setTool("paste"); toast("Copied. Click to stamp it anywhere.");
+  }
+  drawTop();
+});
+top.addEventListener("pointerleave", () => { S.hover = null; if (S.room) drawTop(); });
+
+$("palette").addEventListener("click", e => {
+  const c = $("palette"), rect = c.getBoundingClientRect();
+  const cell = 16 * +$("pal-size").value;
+  const x = Math.floor((e.clientX - rect.left) * c.width / rect.width / cell), y = Math.floor((e.clientY - rect.top) * c.height / rect.height / cell);
+  const m = y * S.palCols + x; if (x < S.palCols && m < S.atlas.n) { S.tile = m; drawPalette(); }
+});
+$("pal-size").addEventListener("change", () => { try { localStorage.setItem("bbb.palSize", $("pal-size").value); } catch (e) {} drawPalette(); });
+
+// ---------- resizable side panel ----------
+const mainEl = document.querySelector(".main"), split = $("splitter");
+function setPanelWidth(w) {
+  const max = Math.max(260, mainEl.clientWidth - 320);
+  w = Math.round(Math.min(max, Math.max(240, w)));
+  mainEl.style.setProperty("--panel-w", w + "px");
+  return w;
+}
+try { const w = +localStorage.getItem("bbb.panelW"); if (w) setPanelWidth(w); const z = localStorage.getItem("bbb.palSize"); if (z) $("pal-size").value = z; } catch (e) {}
+split.addEventListener("pointerdown", e => {
+  split.setPointerCapture(e.pointerId); split.classList.add("dragging"); document.body.classList.add("resizing");
+  const startX = e.clientX, startW = $("panel").getBoundingClientRect().width;
+  const move = ev => setPanelWidth(startW - (ev.clientX - startX));
+  const up = () => {
+    split.removeEventListener("pointermove", move); split.removeEventListener("pointerup", up);
+    split.classList.remove("dragging"); document.body.classList.remove("resizing");
+    try { localStorage.setItem("bbb.panelW", Math.round($("panel").getBoundingClientRect().width)); } catch (e) {}
+  };
+  split.addEventListener("pointermove", move); split.addEventListener("pointerup", up);
+});
+split.addEventListener("keydown", e => {
+  const w = $("panel").getBoundingClientRect().width;
+  if (e.key === "ArrowLeft") setPanelWidth(w + 20); else if (e.key === "ArrowRight") setPanelWidth(w - 20); else return;
+  e.preventDefault();
+});
+new ResizeObserver(() => { drawPalette(); if (S.room) drawSky(); }).observe($("panel"));
+
+function editSel(field, v) {
+  const o = S.room.objects[S.sel]; if (!o) return;
+  pushObjUndo();
+  const lim = { type: 255, x: S.room.map.w * 16 - 1, y: S.room.map.h * 16 - 1, prop: S.room.maxProp }[field];
+  o[field] = Math.max(0, Math.min(lim, Math.round(+v || 0))); S.room.dirty.objects = true; updatePanels(); drawTop(); roomInfo();
+}
+for (const f of ["type", "x", "y", "prop"]) $("o-" + f).addEventListener("change", e => editSel(f, e.target.value));
+$("a-type").addEventListener("input", updatePanels);
+$("a-cat").innerHTML = `<option value="all">All objects</option>` + (BB.OBJ_CATS || []).map(c => `<option>${c}</option>`).join("");
+$("a-cat").value = "Pickups"; $("a-cat").addEventListener("change", buildObjGrid); buildObjGrid();
+for (const t in ICON_IMG) ICON_IMG[t].onload = () => { if (S.room) drawTop(); };
+function delSel() { if (S.sel < 0) return; pushObjUndo(); const o = S.room.objects.splice(S.sel, 1)[0]; S.sel = -1; S.room.dirty.objects = true; updatePanels(); drawTop(); roomInfo(); toast("Deleted " + objName(o.type)); }
+$("o-del").onclick = delSel;
+$("o-dup").onclick = () => { const o = S.room.objects[S.sel]; if (!o) return; pushObjUndo(); S.room.objects.push({ ...o, x: o.x + 24 }); S.sel = S.room.objects.length - 1; S.room.dirty.objects = true; updatePanels(); drawTop(); roomInfo(); };
+
+document.querySelectorAll(".rail button").forEach(b => b.onclick = () => setTool(b.dataset.tool));
+for (const id of ["show-over", "show-col", "show-obj", "show-spr", "show-lbl", "show-grid"]) $(id).addEventListener("change", () => { if (!S.room) return; drawOverlay(); drawCol(); drawTop(); });
+$("zoom").addEventListener("change", e => { S.zoom = +e.target.value; if (S.room) applyZoom(); });
+$("show-sky").addEventListener("change", drawSky);
+$("stage").addEventListener("scroll", () => { if (!S.skyQueued) { S.skyQueued = true; requestAnimationFrame(() => { S.skyQueued = false; if (S.room) drawSky(); }); } });
+window.addEventListener("resize", () => { if (S.room) drawSky(); });
+$("room").addEventListener("change", e => selectRoom(+e.target.value));
+$("btn-undo").onclick = undo; $("btn-redo").onclick = redo;
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+  if ((e.key === "Delete" || e.key === "Backspace") && S.tool === "select") { delSel(); return; }
+  const map = { v: "select", a: "add", t: "tile", c: "col", r: "copy", p: "paste" };
+  const t = map[e.key.toLowerCase()]; if (t && !(t === "paste" && !S.clip)) setTool(t);
+});
+
+// ---------- file open ----------
+const pick = () => $("file").click();
+$("btn-open").onclick = pick; $("btn-open2").onclick = pick;
+$("file").addEventListener("change", e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ""; });
+const stage = $("stage");
+stage.addEventListener("dragover", e => { e.preventDefault(); });
+stage.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+
+// ---------- export ----------
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+async function deflateRaw(b) {
+  if (typeof CompressionStream === "undefined") return null;
+  try { const s = new Blob([b]).stream().pipeThrough(new CompressionStream("deflate-raw")); return new Uint8Array(await new Response(s).arrayBuffer()); } catch (e) { return null; }
+}
+async function makeZip(name, data) {
+  const comp = await deflateRaw(data), method = comp ? 8 : 0, body = comp || data, crc = crc32(data);
+  const nb = new TextEncoder().encode(name);
+  const lh = new Uint8Array(30 + nb.length), dv = new DataView(lh.buffer);
+  dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(8, method, true);
+  dv.setUint32(14, crc, true); dv.setUint32(18, body.length, true); dv.setUint32(22, data.length, true); dv.setUint16(26, nb.length, true); lh.set(nb, 30);
+  const ch = new Uint8Array(46 + nb.length), cv = new DataView(ch.buffer);
+  cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(10, method, true);
+  cv.setUint32(16, crc, true); cv.setUint32(20, body.length, true); cv.setUint32(24, data.length, true); cv.setUint16(28, nb.length, true); ch.set(nb, 46);
+  const end = new Uint8Array(22), ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, 1, true); ev.setUint16(10, 1, true); ev.setUint32(12, ch.length, true); ev.setUint32(16, lh.length + body.length, true);
+  return new Blob([lh, body, ch, end], { type: "application/zip" });
+}
+$("btn-export").onclick = async () => {
+  const edited = S.rooms.filter(r => r && (r.dirty.map || r.dirty.col || r.dirty.objects));
+  if (!edited.length) { toast("Nothing has been edited yet."); return; }
+  const btn = $("btn-export"); btn.disabled = true; $("export-label").textContent = "Building…";
+  try {
+    const out = BB.exportRom(S.srcBytes, S.rooms);
+    const gbaName = (S.fileName || "BFBB") + "-edited.gba";
+    // Desktop app and the offline HTML file: use the browser's own Save As dialog.
+    const topLevel = (() => { try { return window.top === window; } catch (e) { return false; } })();
+    if (topLevel && window.showSaveFilePicker) {
+      let handle = null;
+      try {
+        handle = await window.showSaveFilePicker({ suggestedName: gbaName, types: [{ description: "Game Boy Advance ROM", accept: { "application/octet-stream": [".gba"] } }] });
+      } catch (e) {
+        if (e && e.name === "AbortError") { toast("Save cancelled."); return; }
+        handle = null;
+      }
+      if (handle) {
+        const w = await handle.createWritable(); await w.write(out); await w.close();
+        toast(`Saved ${handle.name}. Open it in mGBA.`, 7000);
+        return;
+      }
+    }
+    if (window.BBB_DESKTOP) {
+      const res = await fetch("/save?name=" + encodeURIComponent(gbaName), { method: "POST", body: out }).then(r => r.json());
+      if (res.ok) toast("Saved " + res.path, 7000);
+      else if (!res.cancelled) toast("Save failed: " + res.error, 8000);
+      return;
+    }
+    let downloads = null;
+    try { downloads = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { downloads = null; }
+    if (downloads) {
+      const zip = await makeZip(gbaName, out);
+      try { await downloads.save({ filename: gbaName.replace(/\.gba$/, ".zip"), data: zip }); toast(`Saved. Unzip it and open ${gbaName} in mGBA.`, 6000); }
+      catch (e) { toast(e && e.code === "declined" ? "Save cancelled." : "Saving isn't available here: " + (e && e.message || e), 6000); }
+    } else {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([out])); a.download = gbaName; document.body.append(a); a.click(); a.remove();
+      toast(`Downloaded ${gbaName}. Open it in mGBA.`, 6000);
+    }
+  } catch (e) { toast("Export failed: " + e.message, 8000); }
+  finally { btn.disabled = false; $("export-label").textContent = "Export ROM"; }
+};
+
+buildSwatches(); setTool("select");
+window.__BBB = S; window.__openFile = openFile;
+})();
+</script>

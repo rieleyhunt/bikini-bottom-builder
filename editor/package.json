@@ -1,0 +1,9 @@
+{
+  "name": "bikini-bottom-builder",
+  "private": true,
+  "description": "Fonts embedded into the desktop build",
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/silkscreen": "^5.3.0"
+  }
+}
