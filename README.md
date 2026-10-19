@@ -28,7 +28,10 @@ A level editor for *SpongeBob SquarePants: Battle for Bikini Bottom* on the Game
 
 ## Getting started
 
-1. Download the latest version from the [Releases page](../../releases/latest). Run `BikiniBottomBuilder.exe` on Windows, or open `BikiniBottomBuilder.html` in Chrome or Edge.
+1. Download the latest version from the [Releases page](../../releases/latest):
+   * **Windows:** `BikiniBottomBuilder.exe`
+   * **Linux:** `BikiniBottomBuilder-x86_64.AppImage` (make it executable, then run it; needs Chrome, Chromium, Edge or Brave)
+   * **Any system:** `BikiniBottomBuilder.html`, opened in Chrome or Edge
 2. Click **Choose .gba file** and open your own *Battle for Bikini Bottom (USA)* ROM. No ROM is included.
 3. Edit, click **Export ROM**, then play the exported file in an emulator such as [mGBA](https://mgba.io).
 

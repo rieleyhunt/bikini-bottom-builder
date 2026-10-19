@@ -707,11 +707,13 @@ $("btn-export").onclick = async () => {
         return;
       }
     }
+    let desktopRes = null;
     if (window.BBB_DESKTOP) {
-      const res = await fetch("/save?name=" + encodeURIComponent(gbaName), { method: "POST", body: out }).then(r => r.json());
-      if (res.ok) toast("Saved " + res.path, 7000);
-      else if (!res.cancelled) toast("Save failed: " + res.error, 8000);
-      return;
+      desktopRes = await fetch("/save?name=" + encodeURIComponent(gbaName), { method: "POST", body: out }).then(r => r.json());
+      if (desktopRes.ok) { toast("Saved " + desktopRes.path, 7000); return; }
+      if (desktopRes.cancelled) return;
+      if (!desktopRes.nodialog) { toast("Save failed: " + desktopRes.error, 8000); return; }
+      // no system Save dialog (Linux without zenity or kdialog): fall back to a normal download
     }
     let downloads = null;
     try { downloads = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { downloads = null; }

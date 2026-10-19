@@ -4,6 +4,8 @@ package main
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -67,6 +69,12 @@ func saveDialog(suggested string) string {
 	}
 	return syscall.UTF16ToString(buf)
 }
+
+func saveDialogAvailable() bool { return true }
+
+func openURL(url string) { exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start() }
+
+func dataDir() string { return filepath.Join(os.Getenv("LocalAppData"), "BikiniBottomBuilder") }
 
 func findBrowser() string {
 	cands := []string{

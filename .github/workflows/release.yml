@@ -1,9 +1,12 @@
 # Builds Bikini Bottom Builder and publishes it.
 #
-# Push a tag such as v1.2 to create a GitHub Release with the .exe and .html attached:
+# Push a tag such as v1.2 to create a GitHub Release with the Windows .exe, the Linux .AppImage
+# and the .html attached:
 #   git tag v1.2
 #   git push origin v1.2
 #
+# You can also run it by hand from the Actions tab ("Run workflow"); the files are then
+# attached to the run as a downloadable artifact instead of a release.
 
 name: Build and release
 
@@ -39,8 +42,10 @@ jobs:
       - name: Build
         run: |
           sh desktop/build.sh
+          sh desktop/build_appimage.sh
           mkdir -p dist
           cp desktop/BikiniBottomBuilder.exe dist/
+          cp desktop/BikiniBottomBuilder-x86_64.AppImage dist/
           cp editor/dist/BikiniBottomBuilder-local.html dist/BikiniBottomBuilder.html
 
       - name: Upload build

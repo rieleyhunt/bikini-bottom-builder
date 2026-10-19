@@ -32,9 +32,17 @@ Needs Go 1.22+, mingw-w64 (`x86_64-w64-mingw32-windres`), Python 3 and npm. It c
 
 The app is a small Go server bound to `127.0.0.1` that serves the embedded editor and opens it in Edge or Chrome with `--app`, using its own profile. It shuts down when the window closes: the page pings `/ping` every 5 s and sends a beacon to `/bye` on close. Exports go through the browser's save picker, with a native Save dialog as a fallback. Logs are written to `%LocalAppData%\BikiniBottomBuilder\log.txt`.
 
+## Linux app (AppImage)
+
+```sh
+desktop/build_appimage.sh
+```
+
+Needs Go 1.22+, Python 3 and npm. It downloads appimagetool the first time. The Linux build uses the same server as the Windows app and opens the editor in Chrome, Chromium, Edge or Brave. If zenity or kdialog is installed, exports use a native Save dialog; otherwise they're saved through the browser.
+
 ## Releases
 
-`.github/workflows/release.yml` builds everything on GitHub. Push a version tag and it creates a Release with `BikiniBottomBuilder.exe` and `BikiniBottomBuilder.html` attached:
+`.github/workflows/release.yml` builds everything on GitHub. Push a version tag and it creates a Release with `BikiniBottomBuilder.exe`, `BikiniBottomBuilder-x86_64.AppImage` and `BikiniBottomBuilder.html` attached:
 
 ```sh
 git tag v1.2

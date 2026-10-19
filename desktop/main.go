@@ -1,6 +1,7 @@
-// Bikini Bottom Builder — Windows launcher.
-// Serves the embedded editor on 127.0.0.1 and opens it in an Edge (or Chrome) app window.
-// Export uses a native Windows "Save As" dialog.
+// Bikini Bottom Builder desktop launcher (Windows and Linux).
+// Serves the embedded editor on 127.0.0.1 and opens it in a Chromium based browser's app window
+// (Edge or Chrome on Windows; Chrome, Chromium, Edge or Brave on Linux).
+// Export uses the browser's save picker, with the system's own Save dialog as a fallback.
 package main
 
 import (
@@ -37,7 +38,7 @@ func main() {
 		println(url)
 	}
 
-	logPath := filepath.Join(os.Getenv("LocalAppData"), "BikiniBottomBuilder", "log.txt")
+	logPath := filepath.Join(dataDir(), "log.txt")
 	os.MkdirAll(filepath.Dir(logPath), 0755)
 	logf, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	logLine := func(f string, a ...any) {
@@ -81,6 +82,9 @@ func main() {
 			json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "No ROM data received."}); return
 		}
 		name := filepath.Base(r.URL.Query().Get("name"))
+		if !saveDialogAvailable() {
+			json.NewEncoder(w).Encode(map[string]any{"ok": false, "nodialog": true}); return
+		}
 		path := saveDialog(name)
 		if path == "" {
 			json.NewEncoder(w).Encode(map[string]any{"ok": false, "cancelled": true}); return
@@ -93,7 +97,7 @@ func main() {
 	}))
 	go http.Serve(ln, mux)
 
-	profile := filepath.Join(os.Getenv("LocalAppData"), "BikiniBottomBuilder", "window")
+	profile := filepath.Join(dataDir(), "window")
 	opened := false
 	if b := findBrowser(); b != "" {
 		cmd := exec.Command(b, "--app="+url, "--user-data-dir="+profile, "--window-size=1440,900",
@@ -101,7 +105,7 @@ func main() {
 		opened = cmd.Start() == nil
 	}
 	if !opened {
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		openURL(url)
 	}
 	// Edge's launcher process can exit straight away, so the window's lifetime is tracked from the
 	// page itself: it pings every few seconds and says goodbye when it closes.
