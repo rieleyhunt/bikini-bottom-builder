@@ -32,6 +32,17 @@ Needs Go 1.22+, mingw-w64 (`x86_64-w64-mingw32-windres`), Python 3 and npm. It c
 
 The app is a small Go server bound to `127.0.0.1` that serves the embedded editor and opens it in Edge or Chrome with `--app`, using its own profile. It shuts down when the window closes: the page pings `/ping` every 5 s and sends a beacon to `/bye` on close. Exports go through the browser's save picker, with a native Save dialog as a fallback. Logs are written to `%LocalAppData%\BikiniBottomBuilder\log.txt`.
 
+## Releases
+
+`.github/workflows/release.yml` builds everything on GitHub. Push a version tag and it creates a Release with `BikiniBottomBuilder.exe` and `BikiniBottomBuilder.html` attached:
+
+```sh
+git tag v1.2
+git push origin v1.2
+```
+
+You can also run it by hand from the Actions tab with **Run workflow**. The files are then attached to that run as a download instead of a release.
+
 ## Research tools
 
 ```sh

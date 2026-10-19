@@ -225,6 +225,9 @@ input[type=checkbox] { accent-color: var(--primary); width: 15px; height: 15px; 
       <section>
         <h2>Room</h2>
         <div class="kv status" id="room-info"><span>—</span><span></span></div>
+        <p class="label" style="margin-top:12px">Overwrite with another room</p>
+        <div class="row"><select id="ow-src" aria-label="Room to copy from" style="flex:1;min-width:0"></select><button id="ow-go" disabled>Overwrite</button></div>
+        <p class="hint" style="margin-top:6px">Replaces everything in this room (tiles, tile set, colours, backgrounds, front layer, collision and objects) with a copy of the room you pick. The room keeps its place in the level, so its exit still leads to the same next room. The music stays the same. Undo brings the old room back.</p>
       </section>
       <p class="status" id="status"></p>
     </aside>
@@ -286,6 +289,7 @@ async function openFile(f) {
     groups[ch].append(new Option(label, i));
   }
   sel.disabled = false; $("btn-export").disabled = false; $("empty").hidden = true;
+  $("ow-src").innerHTML = sel.innerHTML; $("ow-go").disabled = false;
   selectRoom(0);
   toast("Loaded " + f.name);
 }
@@ -410,12 +414,13 @@ function applyZoom() {
   drawSky();
 }
 function roomInfo() {
-  const r = S.room, d = r.dirty, edited = [d.map && "tiles", d.col && "collision", d.objects && "objects"].filter(Boolean).join(", ");
+  const r = S.room, d = r.dirty, edited = [d.overwrite && "overwritten", d.map && "tiles", d.col && "collision", d.objects && !d.overwrite && "objects"].filter(Boolean).join(", ");
   $("room-info").innerHTML = "";
   const add = (k, v) => { const a = document.createElement("span"); a.textContent = k; const b = document.createElement("div"); b.textContent = v; $("room-info").append(a, b); };
   const lv = BB.LEVELS.find(l => l[0] === r.index);
   if (lv) add("Level", `${lv[2]}, part ${lv[3]} of ${lv[4]}`);
   add("Size", `${r.map.w}×${r.map.h} tiles (${r.map.w * 16}×${r.map.h * 16} px)`);
+  if (r.overwriteFrom !== undefined) add("Copied from", roomLabel(r.overwriteFrom));
   add("Objects", r.objects.length); add("Tile set", `${r.metatiles.length / 4} tiles`); add("Edited", edited || "nothing yet");
 }
 
@@ -482,6 +487,11 @@ function pushObjUndo() { pushHistory({ room: S.room.index, kind: "objects", obje
 function applyEntry(u) {
   if (S.room.index !== u.room) { $("room").value = u.room; selectRoom(u.room); }
   const r = S.room;
+  if (u.kind === "room") {
+    const inv = { room: u.room, kind: "room", obj: S.rooms[u.room] };
+    S.rooms[u.room] = u.obj; selectRoom(u.room);
+    return inv;
+  }
   if (u.kind === "objects") {
     const inv = { room: u.room, kind: "objects", objects: cloneObjs(r.objects) };
     r.objects = cloneObjs(u.objects); r.dirty.objects = true; S.sel = -1; drawTop();
@@ -614,6 +624,14 @@ function editSel(field, v) {
 }
 for (const f of ["type", "x", "y", "prop"]) $("o-" + f).addEventListener("change", e => editSel(f, e.target.value));
 $("a-type").addEventListener("input", updatePanels);
+$("ow-go").onclick = () => {
+  const src = +$("ow-src").value, idx = S.room.index;
+  if (src === idx && S.room.overwriteFrom === undefined) { toast("Pick a different room to copy from."); return; }
+  let nr; try { nr = BB.overwriteRoom(S.rom, idx, src); } catch (e) { toast("That room can't be read."); return; }
+  pushHistory({ room: idx, kind: "room", obj: S.rooms[idx] });
+  S.rooms[idx] = nr; selectRoom(idx);
+  toast(`Overwrote this room with ${roomLabel(src)}`);
+};
 $("a-cat").innerHTML = `<option value="all">All objects</option>` + (BB.OBJ_CATS || []).map(c => `<option>${c}</option>`).join("");
 $("a-cat").value = "Pickups"; $("a-cat").addEventListener("change", buildObjGrid); buildObjGrid();
 for (const t in ICON_IMG) ICON_IMG[t].onload = () => { if (S.room) drawTop(); };

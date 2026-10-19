@@ -173,6 +173,96 @@ const BB = (() => {
              col: { w: cw, h: ch, cells: col }, objects, maxProp, objHeader: oh };
   }
 
+  // ---- Object settings ("props"): each object's prop picks a record in the room's settings table.
+  // Exits (60 exit, 61 doorway) store the level part they lead to in byte 6 and the entrance in byte 7.
+  // Entrances (0 start/door, 92/93 vehicle starts) store their entrance number in byte 4.
+  const EXIT_TYPES = [60, 61], ENTRANCE_TYPES = [0, 92, 93];
+  function readParams(rom, room) {
+    const n = room.objects.reduce((m, o) => Math.max(m, o.prop), 0) + 1;
+    const offs = rom.u32(room.objHeader + 8), base = rom.u32(room.objHeader + 12);
+    const off = []; for (let k = 0; k < n; k++) off.push(rom.u16(offs + 2 * k));
+    const sorted = [...new Set(off)].sort((a, b) => a - b);
+    return off.map(o => { const nx = sorted.find(v => v > o); const len = Math.min(nx !== undefined ? nx - o : 8, 32); const a = rom.o(base + o); return rom.b.slice(a, a + len); });
+  }
+  function levelInfo(i) {
+    const e = LEVELS.find(l => l[0] === i); if (!e) return null;
+    const parts = {}; LEVELS.filter(l => l[1] === e[1] && l[2] === e[2]).forEach(l => parts[l[3]] = l[0]);
+    return { part: e[3], parts };
+  }
+  // Exits and entrances of a room with their role in its level: "prev"/"next" for entrances
+  // (arrived at from an earlier or later part), "fwd"/"back"/"same" for exits.
+  function connections(rom, i, room, params) {
+    const lv = levelInfo(i), part = lv ? lv.part : 1;
+    const exits = [], ents = [];
+    room.objects.forEach((o, k) => {
+      const r = params[o.prop]; if (!r) return;
+      if (EXIT_TYPES.includes(o.type)) exits.push({ k, o, dest: r[6], ent: r[7], role: r[6] > part ? "fwd" : r[6] < part ? "back" : "same" });
+      if (ENTRANCE_TYPES.includes(o.type)) ents.push({ k, o, id: r[4], role: null });
+    });
+    if (lv) for (const [q, ri] of Object.entries(lv.parts)) {
+      if (+q === part) continue;
+      let other; try { other = loadRoom(rom, ri); } catch (e) { continue; }
+      const op = readParams(rom, other);
+      other.objects.forEach(o => {
+        const r = op[o.prop]; if (!r || !EXIT_TYPES.includes(o.type) || r[6] !== part) return;
+        ents.filter(en => en.id === r[7] && !en.role).forEach(en => en.role = +q < part ? "prev" : "next");
+      });
+    }
+    ents.forEach(en => { if (!en.role && en.id === 1) en.role = "prev"; });
+    return { part, exits, ents };
+  }
+
+  // A room slot that takes everything (tiles, palette, backgrounds, front layer, collision, objects)
+  // from another room. The slot keeps its place in the level order: the copied exits are rewired to
+  // lead where this slot's exits led, and its entrances take the numbers the neighbouring rooms use.
+  function overwriteRoom(rom, target, source) {
+    const T = loadRoom(rom, target), S = loadRoom(rom, source);
+    const tp = readParams(rom, T), sp = readParams(rom, S);
+    const tc = connections(rom, target, T, tp), sc = connections(rom, source, S, sp);
+    const r = S;
+    r.index = target; r.recAddr = ROOM_TABLE + target * ROOM_SIZE; r.overwriteFrom = source;
+    r.params = sp.map(x => x.slice());
+    const setRec = (k, rec) => { r.objects[k].prop = r.params.length; r.params.push(rec); };
+    const startId = (tc.ents.find(e => e.role === "prev") || tc.ents[0] || { id: 1 }).id;
+    const mapped = {}, assigned = new Map();
+    for (const role of ["fwd", "back"]) {
+      const tx = tc.exits.find(e => e.role === role); if (!tx) continue;
+      const free = sc.exits.filter(e => !assigned.has(e) && e.role !== "same");
+      let ex = free.find(e => e.role === role);
+      if (!ex && free.length) ex = free.reduce((a, b) => (role === "fwd" ? b.o.x > a.o.x : b.o.x < a.o.x) ? b : a);
+      if (ex) { assigned.set(ex, tx); mapped[role] = ex; }
+    }
+    for (const ex of sc.exits) {
+      const rec = r.params[ex.o.prop].slice(), tx = assigned.get(ex);
+      if (tx) { rec[6] = tx.dest; rec[7] = tx.ent; }
+      else if (ex.role === "same") rec[6] = tc.part;
+      else { rec[6] = tc.part; rec[7] = startId; }   // nowhere to go: back to this room's start
+      setRec(ex.k, rec);
+    }
+    // entrances: give each of this slot's entrance numbers to the copied entrance with the same role
+    const used = new Set();
+    for (const te of tc.ents) {
+      let se = sc.ents.find(e => e.role === te.role && !used.has(e)) || sc.ents.find(e => !used.has(e));
+      const near = te.role === "next" ? mapped.fwd : mapped.back;
+      if (!se || (te.role === "next" && se.role !== "next" && near)) {
+        // no matching entrance: add one next to the exit that now leads that way
+        const from = near || sc.exits[0];
+        const base = sc.ents.length ? sc.ents.reduce((b, e) => from && Math.abs(e.o.x - from.o.x) < Math.abs(b.o.x - from.o.x) ? e : b) : null;
+        if (!base) continue;
+        const o = { ...base.o }; r.objects.push(o);
+        const rec = r.params[base.o.prop].slice(); rec[4] = te.id; r.objects[r.objects.length - 1].prop = r.params.length; r.params.push(rec);
+        continue;
+      }
+      used.add(se);
+      const rec = r.params[se.o.prop].slice(); rec[4] = te.id; setRec(se.k, rec);
+    }
+    // copied entrances nothing leads to get unused numbers so they can't clash
+    sc.ents.forEach((e, n) => { if (!used.has(e)) { const rec = r.params[e.o.prop].slice(); rec[4] = 0x20 + n; setRec(e.k, rec); } });
+    r.maxProp = r.params.length - 1;
+    r.dirty = { overwrite: true, objects: true, params: true };
+    return r;
+  }
+
   function tile8(rom, bank, t) { const o = rom.o(bank + t * 64); return rom.b.subarray(o, o + 64); }
   function tile4(rom, bank, t) { const o = rom.o(bank + t * 32); return rom.b.subarray(o, o + 32); }
 
@@ -226,8 +316,20 @@ const BB = (() => {
   function exportRom(srcBytes, rooms) {
     const rom = new Rom(expand(new Uint8Array(srcBytes)));
     const alloc = allocator(rom);
+    const src = new Rom(new Uint8Array(srcBytes));
+    const copy = (addr, n) => { const o = src.o(addr); return src.b.slice(o, o + n); };
     for (const room of rooms) {
       if (!room || !room.dirty) continue;
+      if (room.overwriteFrom !== undefined) {
+        // Copy the source room's record into this slot, with private copies of the main layer
+        // and object header so later edits never touch the source room.
+        const s = ROOM_TABLE + room.overwriteFrom * ROOM_SIZE;
+        rom.b.set(copy(s, ROOM_SIZE), rom.o(room.recAddr));
+        room.mainLayer = alloc.put(copy(src.u32(s + 16), 24));
+        room.objHeader = alloc.put(copy(src.u32(s + 24), 24));
+        rom.w32(room.recAddr + 16, room.mainLayer);
+        rom.w32(room.recAddr + 24, room.objHeader);
+      }
       if (room.dirty.map) {
         const enc = encodeMap(room.map.w, room.map.h, room.map.grid);
         rom.w32(room.mainLayer + 4, alloc.put(enc));
@@ -238,6 +340,14 @@ const BB = (() => {
         raw[0] = w & 255; raw[1] = w >> 8; raw[2] = h & 255; raw[3] = h >> 8;
         for (let k = 0; k < w * h; k++) raw[4 + (k >> 1)] |= (k & 1) ? (cells[k] << 4) : cells[k];
         rom.w32(room.recAddr + 20, alloc.put(lzCompress(raw)));
+      }
+      if (room.dirty.params && room.params) {
+        // rebuild the settings table: u16 offsets, then the records
+        const recs = room.params, offs = new Uint8Array(recs.length * 2 + 2);
+        let total = 0; const at = recs.map(x => { const a = total; total += (x.length + 3) & ~3; return a; });
+        const blob = new Uint8Array(total); recs.forEach((x, k) => { blob.set(x, at[k]); offs[2 * k] = at[k] & 255; offs[2 * k + 1] = at[k] >> 8; });
+        rom.w32(room.objHeader + 8, alloc.put(offs));
+        rom.w32(room.objHeader + 12, alloc.put(blob));
       }
       if (room.dirty.objects) {
         const objs = [...room.objects].sort((a, b) => b.x - a.x);
@@ -255,6 +365,6 @@ const BB = (() => {
   // Collision values, identified by testing each one in mGBA: [name, description, used by the game]
   const COL_INFO = [["Empty", "Nothing here.", 1], ["Hazard", "Hurts SpongeBob on contact (spikes, goo). Not solid, so use it inside pits.", 1], ["Solid (variant A)?", "Solid like 8. Unused by the game; the code also nudges objects stuck inside it upward.", 0], ["Solid (variant B)?", "Solid like 8. Unused by the game; the code also nudges objects stuck inside it downward.", 0], ["Climbable", "Ladders and climbable walls. Press Up to climb.", 1], ["One-way platform", "Stand on it from above; jump up through it and walk through it sideways.", 1], ["No effect (6)", "Unused. Nothing in the game reacts to it.", 0], ["No effect (7)", "Used once (an 8 px gap in a floor in 2-3). Nothing reacts to it.", 1], ["Solid", "Ordinary ground, walls and ceilings. Solid from every side.", 1], ["No effect (9)", "Unused. Nothing in the game reacts to it.", 0], ["Enemy floor", "Invisible to SpongeBob. Flying enemies won't go below it.", 1], ["Enemy wall (left)", "Invisible to SpongeBob. Enemies can't walk or fly left past it. Put it at the left end of a ledge.", 1], ["No effect (12)", "Unused. Nothing in the game reacts to it.", 0], ["Enemy wall (right)", "Invisible to SpongeBob. Enemies can't walk or fly right past it. Put it at the right end of a ledge.", 1], ["Enemy ceiling", "Invisible to SpongeBob. Flying enemies won't go above it.", 1], ["No effect (15)", "Unused. Nothing in the game reacts to it.", 0]];
   const COL_COLORS = ["#0000", "#ff3b30", "#c9a227", "#a88a1f", "#34c759", "#ff9f0a", "#8e8e93", "#8e8e93", "#ffd60a", "#8e8e93", "#bf5af2", "#0a84ff", "#8e8e93", "#64d2ff", "#ff6ad5", "#8e8e93"];
-  return { Rom, ROOM_COUNT, LEVELS, OBJ_NAMES, COL_INFO, COL_COLORS, lzDecompress, lzCompress, decodeMap, encodeMap, loadRoom, drawMetatile, exportRom };
+  return { Rom, ROOM_COUNT, LEVELS, OBJ_NAMES, COL_INFO, COL_COLORS, lzDecompress, lzCompress, decodeMap, encodeMap, loadRoom, overwriteRoom, drawMetatile, exportRom };
 })();
 if (typeof module !== "undefined") module.exports = BB;

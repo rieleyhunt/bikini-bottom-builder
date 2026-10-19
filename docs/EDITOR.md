@@ -6,8 +6,8 @@
 
 | Version | How to run |
 |---|---|
-| **Windows app** | Run `release/BikiniBottomBuilder.exe`. It opens in its own Edge or Chrome window, works offline and saves exports through a normal Save dialog. |
-| **Offline page** | Open `release/BikiniBottomBuilder.html` in Chrome or Edge. Firefox works too, but saves exports as a download. |
+| **Windows app** | Download `BikiniBottomBuilder.exe` from the [Releases page](../../../releases/latest) and run it. It opens in its own Edge or Chrome window, works offline and saves exports through a normal Save dialog. |
+| **Offline page** | Download `BikiniBottomBuilder.html` from the [Releases page](../../../releases/latest) and open it in Chrome or Edge. Firefox works too, but saves exports as a download. |
 
 Click **Choose .gba file** and pick your *Battle for Bikini Bottom (USA)* ROM. The editor checks for game code `BSQE`. It also accepts a ROM you exported earlier.
 
@@ -85,6 +85,17 @@ Collision is drawn as **thin lines, not filled blocks**:
 - Enemy walls (11 and 13) stand as short columns just above the ends of each ledge, which keeps walkers from falling off. When you build a new ledge for enemies, add an 11 above its left end and a 13 above its right end.
 
 <img src="images/editor-collision.png" width="760" alt="Collision brushes">
+
+## Overwriting a room with another
+
+The **Room** panel has **Overwrite with another room**. Pick any room from the game and click **Overwrite**. The current room is replaced with a full copy of it: tiles, tile set, colours, backgrounds, front layer, collision and objects. Use it when you want a level with a completely different look or theme than the one you started from.
+
+The room keeps its place in the level:
+* Its exits are rewired to lead where the original room's exits led, so finishing it still takes you to the next part.
+* Its entrances take the numbers the neighbouring rooms use, so arriving from either side drops you in the right spot.
+* If the copied room has no entrance for one side, the editor adds one next to the matching exit.
+
+The music doesn't change, because the game sets it per level in its code rather than in the room. Undo brings the original room back. You can keep editing the copied room like any other, and the room you copied from is never changed.
 
 ## Objects
 
